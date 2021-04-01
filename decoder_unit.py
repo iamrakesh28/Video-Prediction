@@ -22,10 +22,16 @@ class DecoderUnit(tf.keras.layers.Layer):
         # filter number may be changed
         self.__layer1 = tf.keras.layers.Conv2D(
             decoder_num_imgs + encoder_num_imgs, 
-            filter_size, 
+            filter_size,
+            activation='relu',
             padding='same'
         )
-        self.__layer2 = tf.keras.layers.Conv2D(decoder_num_imgs, filter_size, padding='same')
+        self.__layer2 = tf.keras.layers.Conv2D(
+            decoder_num_imgs, 
+            filter_size, 
+            padding='same',
+            activation='relu'
+        )
         
         # for now, num_heads = 1
         assert(num_heads > 0)

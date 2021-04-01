@@ -14,8 +14,19 @@ class EncoderUnit(tf.keras.layers.Layer):
         self.__norm1 = tf.keras.layers.BatchNormalization()
         self.__norm2 = tf.keras.layers.BatchNormalization()
         # filter number may be changed
-        self.__layer1 = tf.keras.layers.Conv2D(2 * num_images, filter_size, padding='same')
-        self.__layer2 = tf.keras.layers.Conv2D(num_images, filter_size, padding='same')
+        self.__layer1 = tf.keras.layers.Conv2D(
+            2 * num_images, 
+            filter_size, 
+            activation='relu',
+            padding='same'
+        )
+        
+        self.__layer2 = tf.keras.layers.Conv2D(
+            num_images, 
+            filter_size, 
+            activation='relu',
+            padding='same'
+        )
         
         # for now, num_heads = 1
         assert(num_heads > 0)
