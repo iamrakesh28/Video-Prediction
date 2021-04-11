@@ -14,6 +14,7 @@ class Attention(tf.keras.layers.Layer):
         assert(query.shape == keys.shape == values.shape)
         self.__input_shape = query.shape
         
+        return values
         dim_querys = dim_keys = self.__input_shape[1]
         weights = []
         
