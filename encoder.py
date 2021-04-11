@@ -4,24 +4,24 @@ from encoder_unit import EncoderUnit
 
 class Encoder(tf.keras.Model):
     
-    def __init__(self, num_heads, enc_layers, input_shape, filter_sz):
+    def __init__(self, num_heads, enc_layers, d_model, filters, filter_size):
         super(Encoder, self).__init__()
         
-        self.__num_heads  = num_heads
-        self.__enc_layers = enc_layers
-        self.__filter_sz  = filter_sz
-        self.__input_shape= input_shape
-        self.__encoder_units  = []
+        self.num_heads  = num_heads
+        self.enc_layers = enc_layers
+        self.d_model = d_model
+        self.filters  = filters
+        self.filter_size = filter_size
+        self.encoder_units  = []
     
         for layer in range(enc_layers):
-            encoder_unit = EncoderUnit(num_heads, input_shape[3], filter_sz)
-            
-            self.__encoder_units.append(encoder_unit)
+            encoder_unit = EncoderUnit(num_heads, d_model, filters, filter_size)
+            self.encoder_units.append(encoder_unit)
     
 
     def call(self, values, training=True):
         
-        for layer in range(self.__enc_layers):
-            values = self.__encoder_units[layer](values, training)
-        
+        for layer in range(self.enc_layers):
+            values = self.encoder_units[layer](values, training)
+        # print("Encoder : ", values.shape)
         return values
