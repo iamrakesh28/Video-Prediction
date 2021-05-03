@@ -1,5 +1,6 @@
 import tensorflow as tf
 
+from utility import feed_forward_network
 from multi_head_attention import MultiHeadAttention
 
 class DecoderLayer(tf.keras.layers.Layer):
@@ -10,10 +11,7 @@ class DecoderLayer(tf.keras.layers.Layer):
         self.mha1 = MultiHeadAttention(d_model, num_heads, filter_size)
         self.mha2 = MultiHeadAttention(d_model, num_heads, filter_size)
 
-        self.ffn = tf.keras.Sequential([
-            tf.keras.layers.Conv2D(dff, filter_size, padding='same', activation='relu'),
-            tf.keras.layers.Conv2D(d_model, filter_size, padding='same')
-        ])
+        self.ffn = feed_forward_network(dff, d_model, filter_size)
         
         self.layernorm1 = tf.keras.layers.BatchNormalization(epsilon=1e-6)
         self.layernorm2 = tf.keras.layers.BatchNormalization(epsilon=1e-6)
@@ -43,3 +41,4 @@ class DecoderLayer(tf.keras.layers.Layer):
         out3 = self.layernorm3(out2 + ffn_output, training=training)
         
         return out3, attn_weights_block1, attn_weights_block2
+

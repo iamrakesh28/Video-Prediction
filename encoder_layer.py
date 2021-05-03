@@ -1,5 +1,6 @@
 import tensorflow as tf
 
+from utility import feed_forward_network
 from multi_head_attention import MultiHeadAttention
 
 class EncoderLayer(tf.keras.layers.Layer):
@@ -8,10 +9,7 @@ class EncoderLayer(tf.keras.layers.Layer):
         super(EncoderLayer, self).__init__()
         
         self.mha = MultiHeadAttention(d_model, num_heads, filter_size)
-        self.ffn = tf.keras.Sequential([
-            tf.keras.layers.Conv2D(dff, filter_size, padding='same', activation='relu'),
-            tf.keras.layers.Conv2D(d_model, filter_size, padding='same')
-        ])
+        self.ffn = feed_forward_network(dff, d_model, filter_size)
         
         self.layernorm1 = tf.keras.layers.BatchNormalization(epsilon=1e-6)
         self.layernorm2 = tf.keras.layers.BatchNormalization(epsilon=1e-6)
