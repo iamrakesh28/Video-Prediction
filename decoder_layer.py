@@ -1,79 +1,45 @@
 import tensorflow as tf
 
-from attention import Attention
+from multi_head_attention import MultiHeadAttention
 
-class DecoderUnit(tf.keras.layers.Layer):
+class DecoderLayer(tf.keras.layers.Layer):
     
-    def __init__(self, num_heads, d_model, filters, filter_size, time_steps):
-        super(DecoderUnit, self).__init__()
-        self.num_heads = num_heads
-        self.d_model = d_model
-        self.atten_weights = []
-        self.mask_atten_weights = []
-        self.filters = filters + [d_model]
-        self.filter_size = filter_size
-        self.time_steps = time_steps
-        self.attention = Attention()
-        self.mask_attention = Attention()
-        self.norm1 = tf.keras.layers.BatchNormalization()
-        self.norm2 = tf.keras.layers.BatchNormalization()
-        self.norm3 = tf.keras.layers.BatchNormalization()
+    def __init__(self, d_model, num_heads, dff, filter_size):
+        super(DecoderLayer, self).__init__()
         
-        self.layers = []
-        for layer in range(len(self.filters)):
-            conv_layer = tf.keras.layers.Conv2D(
-                self.filters[layer], 
-                filter_size, 
-                activation='relu',
-                padding='same'
-            )
-            self.layers.append(conv_layer)
-        
-        # for now, num_heads = 1
-        assert(num_heads > 0)
-        
-        for head in range(num_heads):
-            
-            self.atten_weights.append([])
-            for qkv in range(3):
-                weight = tf.keras.layers.Conv2D(d_model, filter_size, padding='same')
-                self.atten_weights[head].append(weight)
-                
-        for head in range(num_heads):
-            
-            self.mask_atten_weights.append([])
-            for qkv in range(3):
-                weight = tf.keras.layers.Conv2D(d_model, filter_size, padding='same')
-                self.mask_atten_weights[head].append(weight)
-                
-        
-    def call(self, encoder_inputs, decoder_inputs, training=True):
-        
-        # input shape = (batch_size, time-steps, rows, cols, channels)
-        if (decoder_inputs.shape[1] < self.time_steps):
-            shape = decoder_inputs.shape
-            zeros = tf.zeros([shape[0], self.time_steps - shape[1], shape[2], shape[3], shape[4]])
-            decoder_inputs = tf.concat([decoder_inputs, zeros], axis=1)
-            
-        # masked decoder attention
-        query = self.mask_atten_weights[0][0](decoder_inputs)
-        keys = self.mask_atten_weights[0][1](decoder_inputs)
-        values = self.mask_atten_weights[0][2](decoder_inputs)
-        
-        mask_values = self.norm1(self.mask_attention(query, keys, values), training=training)
-        inputs = tf.concat([encoder_inputs, mask_values], axis=1)
+        self.mha1 = MultiHeadAttention(d_model, num_heads, filter_size)
+        self.mha2 = MultiHeadAttention(d_model, num_heads, filter_size)
 
+        self.ffn = tf.keras.Sequential([
+            tf.keras.layers.Conv2D(dff, filter_size, padding='same', activation='relu'),
+            tf.keras.layers.Conv2D(d_model, filter_size, padding='same')
+        ])
         
-        # encoder decoder attention
-        query = self.atten_weights[0][0](inputs)
-        keys = self.atten_weights[0][1](inputs)
-        values = self.atten_weights[0][2](inputs)
+        self.layernorm1 = tf.keras.layers.BatchNormalization(epsilon=1e-6)
+        self.layernorm2 = tf.keras.layers.BatchNormalization(epsilon=1e-6)
+        self.layernorm3 = tf.keras.layers.BatchNormalization(epsilon=1e-6)
         
+        # No dropouts for now
+                
         
-        attentuated = self.norm2(self.attention(query, keys, values), training=training)
+    def call(self, x, enc_output, training, look_ahead_mask):
+
+        # enc_output.shape = (batch_size, input_seq_len, rows, cols, d_model)
+        # x.shape = (batch_size, input_seq_len, rows, cols, d_model)
         
-        # feed forward
-        for layer in range(len(self.filters)):
-            attentuated = self.layers[layer](attentuated)
-            
-        return self.norm3(attentuated, training=training)
+        attn1, attn_weights_block1 = self.mha1(x, x, x, look_ahead_mask)
+        # (batch_size, target_seq_len, rows, cols, d_model)
+        
+        out1 = self.layernorm1(x + attn1, training=training)
+        # (batch_size, target_seq_len, rows, cols, d_model)
+
+        attn2, attn_weights_block2 = self.mha2(out1, enc_output, enc_output, None)
+        # (batch_size, target_seq_len, rows, cols, d_model)
+        
+        out2 = self.layernorm2(out1 + attn2, training=training)
+        # (batch_size, target_seq_len, rows, cols, d_model)
+
+        ffn_output = self.ffn(out2) # (batch_size, target_seq_len, rows, cols, d_model)
+        out3 = self.layernorm3(out2 + ffn_output, training=training)
+        
+        return out3, attn_weights_block1, attn_weights_block2
