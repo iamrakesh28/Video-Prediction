@@ -2,32 +2,28 @@ import tensorflow as tf
 
 INFINITY = 1e9
 
-def scaled_dot_product_attention(q, k, v, mask):
+def scaled_dot_product_attention(q, k, v, mask=None):
     """
     Calculate the attention weights
 
     Args:
-    q : query shape = (..., seq_len, rows, cols, depth)
-    k : keys shape = (..., seq_len, rows, cols, depth)
-    v : values shape = (..., seq_len, rows, cols, depth)
+    q : query shape = (batch_sz, heads, seq_len_q, rows, cols, depth)
+    k : keys shape = (batch_sz, heads, seq_len_k, rows, cols, depth)
+    v : values shape = (batch_sz, heads, seq_len_v, rows, cols, depth)
+    mask : shape = (batch_sz, heads, seq_len, rows, cols, depth)
     
     Returns:
     outputs, attention_weights
     """
 
-    assert (q.shape == k.shape == v.shape)
-    seq_len = q.shape[-4]
+    seq_len = q.shape[2]
     dim_k = tf.cast(k.shape[-1], tf.float32)
 
     attention_weights = []
     outputs = []
     for seq in range(seq_len):
 
-        query = None
-        if len(q.shape) == 6:
-            query = tf.expand_dims(q[:, :, seq, :, :, :], axis=2)
-        else: # len(q.shape) = 5
-            query = tf.expand_dims(q[:, seq, :, :, :], axis=1)
+        query = tf.expand_dims(q[:, :, seq, :, :, :], axis=2)
             
         scaled_dot_product = tf.reduce_sum(
             tf.reduce_sum(
@@ -49,7 +45,7 @@ def scaled_dot_product_attention(q, k, v, mask):
             axis=-1
         ) * v
 
-        output = tf.reduce_sum(output, axis=-4)
+        output = tf.reduce_sum(output, axis=2)
 
         attention_weights.append(attention_weight)
         outputs.append(output)
@@ -57,67 +53,68 @@ def scaled_dot_product_attention(q, k, v, mask):
     attention_weights = tf.convert_to_tensor(attention_weights)
     outputs = tf.convert_to_tensor(outputs)
 
-    trans_weight = None
-    trans_out = None
-    if len(q.shape) == 6:
-        trans_out = [1, 2, 0, 3, 4, 5]
-        trans_weight = [1, 2, 0, 3]
-    else: # len(q.shape) = 5
-        trans_out = [1, 0, 2, 3, 4]
-        trans_weight = [1, 0, 2]
-
-    attention_weights = tf.transpose(attention_weights, trans_weight)
-    outputs = tf.transpose(outputs, trans_out)
+    attention_weights = tf.transpose(attention_weights, perm=[1, 2, 0, 3])
+    outputs = tf.transpose(outputs, perm=[1, 2, 0, 3, 4, 5])
 
     return outputs, attention_weights
+
+class MultiHeadAttention(tf.keras.layers.Layer):
     
-class Attention(tf.keras.layers.Layer):
-    
-    def __init__(self):
-        # Assumption : query.shape = values.shape = key.shape
-        super(Attention, self).__init__()
-        self.__input_shape = None
-        self.softmax = tf.keras.layers.Softmax()
-    
-    def call(self, query, keys, values):
-        # query shape = (batch_size, time-steps, rows, cols, channels)
+    def __init__(self, d_model, num_heads, filter_size):
+        super(MultiHeadAttention, self).__init__()
+        self.d_model = d_model
+        self.num_heads = num_heads
+        self.filter_size = filter_size
+
+        assert (d_model % num_heads == 0)
+
+        self.depth = d_model // num_heads
+
+        self.wq = tf.keras.layers.Conv2D(d_model, filter_size, padding='same')
+        self.wk = tf.keras.layers.Conv2D(d_model, filter_size, padding='same')
+        self.wv = tf.keras.layers.Conv2D(d_model, filter_size, padding='same')
+
+        self.final_weight = tf.keras.layers.Conv2D(d_model, filter_size, padding='same')
+
+    def split_heads(self, x):
+        """
+        Split the last dimension into (num_heads, depth).
+        Transpose the result such that the shape is 
+        (batch_size, num_heads, seq_len, rows, cols, depth)
         
-        assert(query.shape == keys.shape == values.shape)
-        self.__input_shape = query.shape
+        Args:
+        x : shape = (batch_size, seq_len, rows, cols, depth)
+        """
+        x = tf.reshape(x, x.shape[:4] + (self.num_heads, self.depth))
+        return tf.transpose(x, perm=[0, 4, 1, 2, 3, 5])
         
-        return values
-        dim_querys = dim_keys = self.__input_shape[1]
-        weights = []
+    def call(self, q, k, v, mask=None):
         
-        for q in range(dim_querys):
-            
-            activation = []
-            for k in range(dim_keys):
-                dot_prod = query[:, q, :, :, :] * keys[:, k, :, :, :]
-                dot_prod = tf.reduce_sum(tf.reduce_sum(tf.reduce_sum(dot_prod, 1), 1), 1)
-                
-                activation.append(dot_prod)
-                
-            activation = tf.transpose(tf.convert_to_tensor(activation))
-            activation = self.softmax(activation / np.sqrt(dim_keys))
-            
-            weight = tf.zeros(
-                [self.__input_shape[0], self.__input_shape[2], self.__input_shape[3], self.__input_shape[4]]
-            )
-            for k in range(dim_keys):
-                score = tf.broadcast_to(
-                    tf.reshape(activation[:, k], [self.__input_shape[0], 1, 1, 1]),
-                    [self.__input_shape[0], self.__input_shape[2], self.__input_shape[3], self.__input_shape[4]])
-                
-                weight += score * values[:, k, :, :, :]
-            
-            weights.append(weight)
-        
-        weights = tf.transpose(tf.convert_to_tensor(weights), [1, 0, 2, 3, 4])
-            
-        return weights
+        shape_q = q.shape
+        q = self.wq(q) # (batch_size, seq_len_q, rows, cols, depth)
+        k = self.wk(k) # (batch_size, seq_len_k, rows, cols, depth)
+        v = self.wv(v) # (batch_size, seq_len_v, rows, cols, depth)
+
+        q = self.split_heads(q) # (batch_size, num_heads, seq_len_q, rows, cols, depth)
+        k = self.split_heads(k) # (batch_size, num_heads, seq_len_k, rows, cols, depth)
+        v = self.split_heads(v) # (batch_size, num_heads, seq_len_v, rows, cols, depth)
+
+        # scaled_attention.shape == (batch_size, num_heads, seq_len_q, rows, cols, depth)
+        # attention_weights.shape == (batch_size, num_heads, seq_len_q, seq_len_k)
+        scaled_attention, attention_weights = scaled_dot_product_attention(q, k, v, mask)
+
+        scaled_attention = tf.transpose(scaled_attention, perm=[0, 2, 3, 4, 1, 5])
+        # (batch_size, seq_len_q, rows, cols, num_heads, depth)
+        concat_attention = tf.reshape(scaled_attention, shape_q)
+
+        output = self.final_weight(concat_attention)
+
+        return output, attention_weights
 
 
-x = tf.random.normal([2, 2, 3, 4, 4, 3])
-a, b = scaled_dot_product_attention(x, x, x, None)
+"""
+mha = MultiHeadAttention(4, 2, (3, 3))
+x = tf.random.normal([2, 3, 4, 4, 4])
+a, b = mha(x, x, x)
 print(a.shape, b.shape, x.shape)
+"""
