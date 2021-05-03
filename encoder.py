@@ -1,27 +1,35 @@
 import tensorflow as tf
 
-from encoder_unit import EncoderUnit
+from utility import positional_encoding
+from encoder_layer import EncoderLayer
 
-class Encoder(tf.keras.Model):
+class Encoder(tf.keras.layers.Layer):
     
-    def __init__(self, num_heads, enc_layers, d_model, filters, filter_size):
+    def __init__(self, num_layers, d_model, num_heads, dff, filter_size,
+                 image_shape, max_position_encoding):
         super(Encoder, self).__init__()
         
-        self.num_heads  = num_heads
-        self.enc_layers = enc_layers
+        self.num_layers = num_layers
         self.d_model = d_model
-        self.filters  = filters
-        self.filter_size = filter_size
-        self.encoder_units  = []
-    
-        for layer in range(enc_layers):
-            encoder_unit = EncoderUnit(num_heads, d_model, filters, filter_size)
-            self.encoder_units.append(encoder_unit)
+
+        self.embedding = tf.keras.layers.Conv2D(d_model, filter_size, padding='same')
+        self.pos_encoding = positional_encoding(max_position_encoding, image_shape, d_model)
+        
+        self.enc_layers  = [EncoderLayer(d_model, num_heads, dff, filter_size)
+                            for _ in range(num_layers)]
     
 
-    def call(self, values, training=True):
+    def call(self, x, training, mask):
+
+        # x.shape = (batch_size, seq_len, rows, cols, depth)
+        seq_len = x.shape[1]
         
-        for layer in range(self.enc_layers):
-            values = self.encoder_units[layer](values, training)
-        # print("Encoder : ", values.shape)
-        return values
+        # image embedding and position encoding
+        x = self.embedding(x)
+        x *= tf.math.sqrt(tf.cast(self.d_model, tf.float32))
+        x += self.pos_encoding[:, :seq_len, :, :, :]
+        
+        for layer in range(self.num_layers):
+            x = self.enc_layers[layer](x, training, mask)
+
+        return x # (batch_size, seq_len, rows, cols, d_model)
