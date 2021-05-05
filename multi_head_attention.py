@@ -34,6 +34,11 @@ def scaled_dot_product_attention(q, k, v, mask=None):
         ) / tf.math.sqrt(dim_k)
 
         if mask is not None:
+            mask = tf.concat(
+                (tf.zeros(mask[:seq + 1].shape), mask[:seq_len - seq - 1]),
+                axis=0
+            )
+            mask = tf.expand_dims(mask, axis=0)
             scaled_dot_product += (mask * -INFINITY)
                                    
         attention_weight = tf.nn.softmax(scaled_dot_product, axis=-1)
