@@ -14,7 +14,7 @@ class Transformer(tf.keras.Model):
                                image_shape, pe_target)
 
         self.final_layer = tf.keras.layers.Conv2D(out_channel, filter_size,
-                                                  padding='same', activation='softmax')
+                                                  padding='same', activation='sigmoid')
 
     def call(self, inp, tar, training, look_ahead_mask):
 
