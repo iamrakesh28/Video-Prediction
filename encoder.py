@@ -12,7 +12,8 @@ class Encoder(tf.keras.layers.Layer):
         self.num_layers = num_layers
         self.d_model = d_model
 
-        self.embedding = tf.keras.layers.Conv2D(d_model, filter_size, padding='same')
+        self.embedding = tf.keras.layers.Conv2D(d_model, filter_size, 
+                                                padding='same', activation='relu')
         self.pos_encoding = positional_encoding(max_position_encoding, image_shape, d_model)
         
         self.enc_layers  = [EncoderLayer(d_model, num_heads, dff, filter_size)
