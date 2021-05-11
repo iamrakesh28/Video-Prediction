@@ -1,8 +1,45 @@
 import tensorflow as tf
 import numpy as np
 from encoder_decoder import EncoderDecoder
-from test import test_model
 
+def generate_movies(n_samples=1200, n_frames=20):
+    row = 80
+    col = 80
+    noisy_movies = np.zeros((n_samples, n_frames, row, col, 1), dtype=np.float)
+    shifted_movies = np.zeros((n_samples, n_frames, row, col, 1),
+                              dtype=np.float)
+
+    for i in range(n_samples):
+        # Add 3 to 7 moving squares
+        n = np.random.randint(3, 8)
+
+        for j in range(n):
+            # Initial position
+            xstart = np.random.randint(20, 60)
+            ystart = np.random.randint(20, 60)
+            # Direction of motion
+            directionx = np.random.randint(0, 3) - 1
+            directiony = np.random.randint(0, 3) - 1
+
+            # Size of the square
+            w = np.random.randint(2, 4)
+
+            for t in range(n_frames):
+                x_shift = xstart + directionx * t
+                y_shift = ystart + directiony * t
+
+                # Shift the ground truth by 1
+                x_shift = xstart + directionx * (t + 1)
+                y_shift = ystart + directiony * (t + 1)
+                shifted_movies[i, t, x_shift - w: x_shift + w,
+                               y_shift - w: y_shift + w, 0] += 1
+
+    # Cut to a 40x40 window
+    shifted_movies = shifted_movies[::, ::, 20:60, 20:60, ::]
+    shifted_movies[shifted_movies >= 1] = 1
+    return shifted_movies
+    
+    
 def load_dataset(path, filename):
     train_data = np.load(path + filename)
     train_data = train_data.swapaxes(0, 1)[:100]
@@ -45,26 +82,18 @@ def plot_result(input_, actual, predict):
         
 def main():
     
-    tf.debugging.set_log_device_placement(False)
-    X, Y = load_dataset("../input/mnist-cs/", 'mnist_test_seq.npy')
+    shifted_movies = tf.convert_to_tensor(generate_movies(n_samples=1200), dtype=tf.float32)
+	print(shifted_movies.shape)
     
-    model = EncoderDecoder(
-        1,
-        1,
-        10,
-        [16, 16], 
-        (3, 3),
-        4,
-        X.shape,
-        Y.shape[1],
-        Y.shape[4],
-        './training_checkpoints'
-    )
-    
-    #model.restore()
-    model.train(X[:100], Y[:100], 50, X[100:100], Y[100:100], X, Y)
+	X = shifted_movies[:, :10, :, :, :]
+	Y = shifted_movies[:, 10:, :, :, :]
 
-    test_model(model, X, Y)
+	# defines the model
+	model = VideoPrediction(num_layers=3, d_model=64, num_heads=16, dff=128, filter_size=(3, 3), 
+	image_shape=(40, 40), pe_input=10, pe_target=20, out_channel=1)
+	# training on first 1000 samples
+	# samples from 1000 - 1199 are used as test set
+	model.train(X[:1000], Y[:1000], 100, 8)
     
 
 if __name__ == "__main__":
