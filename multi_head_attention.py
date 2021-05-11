@@ -35,10 +35,9 @@ def scaled_dot_product_attention(q, k, v, mask=None):
 
         if mask is not None:
             mask = tf.concat(
-                (tf.zeros(mask[:seq + 1].shape), mask[:seq_len - seq - 1]),
-                axis=0
+                (tf.zeros(mask[:, :, :seq + 1].shape), mask[:, :, :seq_len - seq - 1]),
+                axis=-1
             )
-            mask = tf.expand_dims(mask, axis=0)
             scaled_dot_product += (mask * -INFINITY)
                                    
         attention_weight = tf.nn.softmax(scaled_dot_product, axis=-1)
@@ -75,9 +74,9 @@ class MultiHeadAttention(tf.keras.layers.Layer):
 
         self.depth = d_model // num_heads
 
-        self.wq = tf.keras.layers.Conv2D(d_model, filter_size, padding='same')
-        self.wk = tf.keras.layers.Conv2D(d_model, filter_size, padding='same')
-        self.wv = tf.keras.layers.Conv2D(d_model, filter_size, padding='same')
+        self.wq = tf.keras.layers.Conv2D(d_model, filter_size, padding='same', activation='relu')
+        self.wk = tf.keras.layers.Conv2D(d_model, filter_size, padding='same', activation='relu')
+        self.wv = tf.keras.layers.Conv2D(d_model, filter_size, padding='same', activation='relu')
 
         self.final_weight = tf.keras.layers.Conv2D(d_model, filter_size, padding='same')
 
@@ -115,11 +114,3 @@ class MultiHeadAttention(tf.keras.layers.Layer):
         output = self.final_weight(concat_attention)
 
         return output, attention_weights
-
-
-"""
-mha = MultiHeadAttention(4, 2, (3, 3))
-x = tf.random.normal([2, 3, 4, 4, 4])
-a, b = mha(x, x, x)
-print(a.shape, b.shape, x.shape)
-"""
