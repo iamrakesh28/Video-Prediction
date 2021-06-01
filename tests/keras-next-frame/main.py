@@ -1,6 +1,6 @@
 import tensorflow as tf
 import numpy as np
-from encoder_decoder import EncoderDecoder
+from transformer_video import VideoPrediction
 
 def generate_movies(n_samples=1200, n_frames=20):
     row = 80
@@ -83,17 +83,39 @@ def plot_result(input_, actual, predict):
 def main():
     
     shifted_movies = tf.convert_to_tensor(generate_movies(n_samples=1200), dtype=tf.float32)
-	print(shifted_movies.shape)
-    
-	X = shifted_movies[:, :10, :, :, :]
-	Y = shifted_movies[:, 10:, :, :, :]
+    print(shifted_movies.shape)
 
-	# defines the model
-	model = VideoPrediction(num_layers=3, d_model=64, num_heads=16, dff=128, filter_size=(3, 3), 
-	image_shape=(40, 40), pe_input=10, pe_target=20, out_channel=1)
-	# training on first 1000 samples
-	# samples from 1000 - 1199 are used as test set
-	model.train(X[:1000], Y[:1000], 100, 8)
+    X = shifted_movies[:, :10, :, :, :]
+    Y = shifted_movies[:, 10:, :, :, :]
+    
+    # defines the model
+    model = VideoPrediction(
+        num_layers=3, d_model=64, num_heads=16, dff=128,
+        filter_size=(3, 3), image_shape=(40, 40), pe_input=10,
+        pe_target=20, out_channel=1, loss_function='bin_cross'
+    )
+    
+    # training on first 1000 samples
+    # samples from 1000 - 1199 are used as test set
+    model.train(X[:1000, :5], X[:1000, 5:], None, None, 1, 8)
+
+    x1 = tf.concat((X[1036], Y[1036]), axis=0)
+    x2 = tf.concat((X[1017], Y[1017]), axis=0)
+    y1 = model.predict(x1[:10], 10)
+    y2 = model.predict(x2[:10], 10)
+    x1 = x1.numpy().reshape(20, 40, 40)
+    x2 = x2.numpy().reshape(20, 40, 40)
+    plot_result(x1[:10], x1[10:], y1.reshape(10, 40, 40))
+    plot_result(x2[:10], x2[10:], y2.reshape(10, 40, 40))
+
+    x1 = tf.concat((X[1026], Y[1026]), axis=0)
+    x2 = tf.concat((X[1027], Y[1027]), axis=0)
+    y1 = model.predict(x1[:10], 10)
+    y2 = model.predict(x2[:10], 10)
+    x1 = x1.numpy().reshape(20, 40, 40)
+    x2 = x2.numpy().reshape(20, 40, 40)
+    plot_result(x1[:10], x1[10:], y1.reshape(10, 40, 40))
+    plot_result(x2[:10], x2[10:], y2.reshape(10, 40, 40))
     
 
 if __name__ == "__main__":
