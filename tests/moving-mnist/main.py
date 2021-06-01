@@ -35,7 +35,6 @@ def main():
     )
     
     # training on first 1000 samples
-    # samples from 1000 - 1199 are used as test set
     model.train(X[:1000, :5], X[:1000, 5:], X, Y, 100, 8)
 
     test_model(model, X, Y, 8)
