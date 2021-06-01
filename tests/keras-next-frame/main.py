@@ -90,14 +90,14 @@ def main():
     
     # defines the model
     model = VideoPrediction(
-        num_layers=3, d_model=64, num_heads=16,
-        dff=128, filter_size=(3, 3), image_shape=(40, 40),
-        pe_input=10, pe_target=20, out_channel=1
+        num_layers=3, d_model=64, num_heads=16, dff=128,
+        filter_size=(3, 3), image_shape=(40, 40), pe_input=10,
+        pe_target=20, out_channel=1, loss_function='bin_cross'
     )
     
     # training on first 1000 samples
     # samples from 1000 - 1199 are used as test set
-    model.train(X[:1000, :5], X[:1000, 5:], 50, 8)
+    model.train(X[:1000, :5], X[:1000, 5:], None, None, 1, 8)
 
     x1 = tf.concat((X[1036], Y[1036]), axis=0)
     x2 = tf.concat((X[1017], Y[1017]), axis=0)
