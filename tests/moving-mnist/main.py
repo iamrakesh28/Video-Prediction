@@ -31,9 +31,10 @@ def main():
     # defines the model
     model = VideoPrediction(
         num_layers=5, d_model=64, num_heads=16, dff=128, filter_size=(3, 3),
-        image_shape=X.shape[2:-1], pe_input=10, pe_target=10, out_channel=X.shape[-1]
+        image_shape=X.shape[2:-1], pe_input=10, pe_target=10, out_channel=X.shape[-1],
+        loss_function='bin_cross'
     )
-    
+
     # training on first 1000 samples
     model.train(X[:1000, :5], X[:1000, 5:], X, Y, 100, 8)
 
