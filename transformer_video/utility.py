@@ -36,6 +36,6 @@ def positional_encoding(position, base_dim, d_model):
 
     return tf.cast(pos_encoding, dtype=tf.float32)
 
-def create_look_ahead_mask(size):
+def create_look_ahead_mask(seq_len):
 
-    return tf.ones(size, dtype=tf.float32)
+    return tf.ones((1, 1, seq_len), dtype=tf.float32)
