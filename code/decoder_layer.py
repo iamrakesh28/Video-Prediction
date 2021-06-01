@@ -1,7 +1,7 @@
 import tensorflow as tf
 
-from utility import feed_forward_network
-from multi_head_attention import MultiHeadAttention
+from .utility import feed_forward_network
+from .multi_head_attention import MultiHeadAttention
 
 class DecoderLayer(tf.keras.layers.Layer):
     

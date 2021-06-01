@@ -1,8 +1,8 @@
 import tensorflow as tf
 import time
 
-from transformer import Transformer
-from utility import create_look_ahead_mask
+from .transformer import Transformer
+from .utility import create_look_ahead_mask
 
 class VideoPrediction:
     def __init__(self, num_layers, d_model, num_heads, dff, filter_size, image_shape, 
