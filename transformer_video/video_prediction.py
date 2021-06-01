@@ -34,7 +34,7 @@ class VideoPrediction:
 
         return loss
 
-    def train(self, inp, tar, inp_test, tar_test, epochs, batch_size, epoch_print=5):
+    def train(self, inp, tar, inp_val, tar_val, epochs, batch_size, epoch_print=5):
 
         start = time.time()
         for epoch in range(epochs):
