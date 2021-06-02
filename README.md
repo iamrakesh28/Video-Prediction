@@ -62,7 +62,7 @@ and sigmoid activation. The total training loss was 0.0002.
 
 <p align="center">
   <img src="images/next-frame/next-frame-trans1.gif">
-  <img src="images/mnist/next-frame-trans2.gif">
+  <img src="images/next-frame/next-frame-trans2.gif">
  </br>
  </p>
  
